@@ -88,6 +88,9 @@ double ups_temperature = 0.0;
 char *ups_status;
 int temp_output_c = 0;
 
+
+int sd;
+
 int determine_status (void);
 int get_ups_variable (const char *, char *, size_t);
 
@@ -126,6 +129,9 @@ main (int argc, char **argv)
 
 	/* set socket timeout */
 	alarm (timeout_interval);
+
+	if (np_net_connect (server_address, server_port, &sd, IPPROTO_TCP) != STATE_OK)
+		return STATE_CRITICAL;
 
 	/* get the ups status if possible */
 	if (determine_status () != OK)
@@ -288,13 +294,12 @@ main (int argc, char **argv)
 		return STATE_CRITICAL;
 	else {
  		supported_options |= UPS_TEMP;
+		tunits="";
 		if (temp_output_c) {
-		  tunits="degC";
 		  ups_temperature = atof (temp_buffer);
 		  xasprintf (&message, "%sTemp=%3.1fC", message, ups_temperature);
 		}
 		else {
-		  tunits="degF";
 		  ups_temperature = (atof (temp_buffer) * 1.8) + 32;
 		  xasprintf (&message, "%sTemp=%3.1fF", message, ups_temperature);
 		}
@@ -402,12 +407,16 @@ get_ups_variable (const char *varname, char *buf, size_t buflen)
 
 	/* create the command string to send to the UPS daemon */
 	/* Add LOGOUT to avoid read failure logs */
-	sprintf (send_buffer, "GET VAR %s %s\nLOGOUT\n", ups_name, varname);
+	sprintf (send_buffer, "GET VAR %s %s\n", ups_name, varname);
 
 	/* send the command to the daemon and get a response back */
-	if (process_tcp_request
-			(server_address, server_port, send_buffer, temp_buffer,
-			 sizeof (temp_buffer)) != STATE_OK) {
+	// if (process_tcp_request
+	// 		(server_address, server_port, send_buffer, temp_buffer,
+	// 		 sizeof (temp_buffer)) != STATE_OK) {
+	// 	printf ("%s\n", _("Invalid response received from host"));
+	// 	return ERROR;
+	// }
+	if (send_request (sd, IPPROTO_TCP, send_buffer, temp_buffer, sizeof (temp_buffer)) != STATE_OK) {
 		printf ("%s\n", _("Invalid response received from host"));
 		return ERROR;
 	}
